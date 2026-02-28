@@ -149,7 +149,7 @@ io.on('connection', (socket) => {
 });
 
 // Serve frontend static files in production
-const frontendDist = path.join(__dirname, '../frontend/dist');
+const frontendDist = path.join(__dirname, 'dist');
 app.use(express.static(frontendDist));
 
 // SPA fallback — toutes les routes non-API renvoient index.html

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Script de démarrage CatStego
+# Script de démarrage CatStego V2
 
-echo "🐱 Démarrage de CatStego..."
+echo "🐱 Démarrage de CatStego V2..."
 echo ""
 
 # Backend
@@ -23,7 +23,7 @@ npm run dev &
 FRONTEND_PID=$!
 
 echo ""
-echo "✅ CatStego est prêt !"
+echo "✅ CatStego V2 est prêt !"
 echo "   Frontend : http://localhost:5173"
 echo "   Backend  : http://localhost:3001"
 echo ""
