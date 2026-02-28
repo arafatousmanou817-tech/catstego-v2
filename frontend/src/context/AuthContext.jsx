@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
-// Configure axios base URL for production
-axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
+// En production, le backend sert aussi le frontend — les appels /api sont relatifs
+// En dev, Vite proxy /api → localhost:3001 (vite.config.js)
 
 const AuthContext = createContext(null);
 

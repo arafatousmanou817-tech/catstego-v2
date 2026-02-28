@@ -53,7 +53,7 @@ const Home = () => {
       <div className="px-5 pt-4 pb-3" style={{ background: 'rgba(13, 13, 13, 0.8)' }}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold gradient-text">CatStego</h1>
+            <h1 className="text-lg font-bold gradient-text">CatStego V2</h1>
             <div className="flex items-center gap-2">
               <div className={`w-1.5 h-1.5 rounded-full ${socketCtx?.connected ? 'bg-green-400' : 'bg-red-400'}`} />
               <span className="text-xs text-white/40">
@@ -121,6 +121,15 @@ const Home = () => {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="p-3 rounded-xl flex items-center gap-3"
+             style={{ background: 'rgba(233, 69, 96, 0.08)', border: '1px solid rgba(233, 69, 96, 0.15)' }}>
+          <Zap size={14} style={{ color: '#E94560' }} className="flex-shrink-0" />
+          <p className="text-xs text-white/50">
+            <span style={{ color: '#E94560' }} className="font-medium">Astuce : </span>
+            Essayez la clé <span className="font-mono" style={{ color: '#FF6B35' }}>"meow"</span> pour un easter egg 🐱
+          </p>
         </div>
       </div>
 

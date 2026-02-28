@@ -2,9 +2,13 @@
   "name": "catstego-v2-backend",
   "version": "1.0.0",
   "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "build": "cd ../frontend && npm install && npm run build",
+    "railway:start": "npm run build && npm start"
   },
   "dependencies": {
     "express": "^4.18.2",

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -9,8 +10,8 @@ const db = require('./db');
 const app = express();
 const server = http.createServer(app);
 
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
+const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
+  ? false // même origine, CORS non nécessaire
   : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'];
 
 const io = new Server(server, {
@@ -19,7 +20,7 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true
   },
-  maxHttpBufferSize: 10 * 1024 * 1024 // 10MB pour les images base64
+  maxHttpBufferSize: 10 * 1024 * 1024
 });
 
 // Middleware
@@ -56,7 +57,7 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   const userId = socket.user.id;
-  console.log(`Utilisateur connecté: ${socket.user.username} (${socket.id})`);
+  console.log(`✅ Utilisateur connecté: ${socket.user.username} (${socket.id})`);
 
   // Enregistrer l'utilisateur en ligne
   onlineUsers.set(userId, socket.id);
@@ -140,14 +141,25 @@ io.on('connection', (socket) => {
 
   // Déconnexion
   socket.on('disconnect', () => {
-    console.log(`Déconnexion: ${socket.user.username}`);
+    console.log(`❌ Déconnexion: ${socket.user.username}`);
     onlineUsers.delete(userId);
     db.prepare('UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
     io.emit('online_users', Array.from(onlineUsers.keys()));
   });
 });
 
+// Serve frontend static files in production
+const frontendDist = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendDist));
+
+// SPA fallback — toutes les routes non-API renvoient index.html
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`CatStego Backend démarré sur http://localhost:${PORT}`);
+  console.log(`🐱 CatStego V2 démarré sur http://localhost:${PORT}`);
 });

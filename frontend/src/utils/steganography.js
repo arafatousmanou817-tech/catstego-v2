@@ -1,5 +1,5 @@
 /**
- * CatStego — Stéganographie LSB
+ * CatStego V2 — Stéganographie LSB
  * Encode/Decode messages dans les bits de poids faible des pixels
  */
 
