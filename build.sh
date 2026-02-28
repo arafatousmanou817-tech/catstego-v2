@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-echo "📦 Installing frontend dependencies..."
+echo "📦 Installing frontend dependencies (including devDeps)..."
 cd /app/frontend
-npm install
+NODE_ENV=development npm install
 
 echo "🔨 Building frontend..."
 npm run build
