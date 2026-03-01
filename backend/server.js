@@ -77,7 +77,7 @@ io.on('connection', (socket) => {
 
   socket.on('send_message', async (data) => {
     const { receiverId, content, type = 'text', tempId } = data;
-
+    
     // Validation de taille pour les images (max 10MB)
     if (type === 'catstego_image' && content && content.length > 10 * 1024 * 1024 * 1.33) {
       return socket.emit('message_error', { error: "L'image est trop volumineuse (max 10Mo)", tempId });

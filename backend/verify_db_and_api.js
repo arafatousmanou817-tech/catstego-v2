@@ -4,8 +4,8 @@ async function verify() {
   console.log('--- Verifying Database Schema ---');
   try {
     const tables = await db.query(`
-      SELECT table_name
-      FROM information_schema.tables
+      SELECT table_name 
+      FROM information_schema.tables 
       WHERE table_schema = 'public'
     `);
     const tableNames = tables.rows.map(r => r.table_name);
@@ -21,8 +21,8 @@ async function verify() {
     }
 
     const indexes = await db.query(`
-      SELECT indexname
-      FROM pg_indexes
+      SELECT indexname 
+      FROM pg_indexes 
       WHERE schemaname = 'public'
     `);
     const indexNames = indexes.rows.map(r => r.indexname);

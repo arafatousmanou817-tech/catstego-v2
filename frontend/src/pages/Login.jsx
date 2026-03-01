@@ -30,6 +30,10 @@ const Login = () => {
       login(data.token, data.user);
       navigate('/home');
     } catch (err) {
+      if (err.response?.data?.needsVerification) {
+        navigate('/verify-email', { state: { email: err.response.data.email } });
+        return;
+      }
       setError(err.response?.data?.error || 'Erreur de connexion');
     } finally {
       setLoading(false);

@@ -14,6 +14,9 @@ const initDB = async () => {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       avatar_color TEXT DEFAULT '#FF6B35',
+      is_verified BOOLEAN DEFAULT FALSE,
+      verification_code TEXT,
+      verification_expires TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW(),
       last_seen TIMESTAMP
     );

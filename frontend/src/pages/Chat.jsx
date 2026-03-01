@@ -292,7 +292,7 @@ const Chat = () => {
       setConversations(prev => {
         const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
         const existingConvIdx = prev.findIndex(c => c.id === otherId);
-
+        
         const updatedConv = {
           id: otherId,
           username: msg.sender_id === user.id ? selectedContactRef.current?.username : msg.sender_username,
@@ -440,15 +440,15 @@ const Chat = () => {
 
     try {
       const { data } = await axios.get(`/api/messages/${contactId}?page=${pageNum}&limit=20`);
-
+      
       if (append) {
         setMessages(prev => [...data, ...prev]);
       } else {
         setMessages(data);
       }
-
+      
       if (data.length < 20) setHasMore(false);
-
+      
       if (pageNum === 1) {
         markAsRead?.(contactId);
         if (socket) socket.emit('mark_read', { senderId: contactId });
@@ -727,20 +727,23 @@ const Chat = () => {
                           <img src={msg.content} alt="CatStego" className="max-w-[180px] rounded-xl" loading="lazy" />
                           <div className="absolute bottom-0 left-0 right-0 p-1.5 flex items-center justify-between"
                                style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
-                            <span className="text-xs text-white/70">🔒</span>
+                            <span className="text-xs text-white/70">🔒 CatStego</span>
                             <div className="flex gap-1">
-                              <button
-                                onClick={() => setShowDecodeModal(msg.content)}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                style={{ background: 'rgba(255, 107, 53, 0.3)', color: '#FF6B35' }}>
-                                <Eye size={10} />
-                                Décoder
-                              </button>
+                              {!isMine && (
+                                <button
+                                  onClick={() => setShowDecodeModal(msg.content)}
+                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ background: 'rgba(255, 107, 53, 0.3)', color: '#FF6B35' }}>
+                                  <Eye size={10} />
+                                  Décoder
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleDownloadImage(msg.content)}
                                 className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                 style={{ background: 'rgba(255, 255, 255, 0.2)', color: 'white' }}>
                                 <Download size={10} />
+                                Télécharger
                               </button>
                             </div>
                           </div>

@@ -84,6 +84,7 @@ export const NotificationProvider = ({ children }) => {
       unreadByUser,
       markAsRead,
       setUnreadCounts,
+      addToast,
       setOpenChatUserId
     }}>
       {children}
