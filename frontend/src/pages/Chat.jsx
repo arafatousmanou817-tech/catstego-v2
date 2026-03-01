@@ -727,7 +727,7 @@ const Chat = () => {
                           <img src={msg.content} alt="CatStego" className="max-w-[180px] rounded-xl" loading="lazy" />
                           <div className="absolute bottom-0 left-0 right-0 p-1.5 flex items-center justify-between"
                                style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
-                            <span className="text-xs text-white/70">🔒 CatStego</span>
+                            <span className="text-xs text-white/70">🔒</span>
                             <div className="flex gap-1">
                               {!isMine && (
                                 <button
@@ -743,7 +743,6 @@ const Chat = () => {
                                 className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                 style={{ background: 'rgba(255, 255, 255, 0.2)', color: 'white' }}>
                                 <Download size={10} />
-                                Télécharger
                               </button>
                             </div>
                           </div>
