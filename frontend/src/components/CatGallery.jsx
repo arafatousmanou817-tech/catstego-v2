@@ -1,50 +1,63 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, Upload } from 'lucide-react';
 
+const fetchAsBase64 = async (url) => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(ev.target.result);
+    reader.readAsDataURL(blob);
+  });
+};
+
 const CatGallery = ({ onSelect, selectedUrl }) => {
-  const [cats, setCats] = useState([]);
+  const [cats, setCats] = useState([]); // [{base64, loading}]
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  const generateCatUrls = (count = 9) => {
-    return Array.from({ length: count }, (_, i) => 
-      `https://cataas.com/cat?width=300&height=300&t=${Date.now()}-${i}-${Math.random()}`
-    );
-  };
 
   const loadCats = async (append = false) => {
     if (append) setLoadingMore(true);
     else setLoading(true);
 
-    const newUrls = generateCatUrls(9);
-    
+    // Créer 9 placeholders "en chargement"
+    const placeholders = Array.from({ length: 9 }, () => ({ base64: null, loading: true }));
+
     if (append) {
-      setCats(prev => [...prev, ...newUrls]);
-      setLoadingMore(false);
+      setCats(prev => [...prev, ...placeholders]);
     } else {
-      setCats(newUrls);
+      setCats(placeholders);
       setLoading(false);
     }
+
+    // Charger chaque image en parallèle et mettre à jour au fur et à mesure
+    const urls = Array.from({ length: 9 }, (_, i) =>
+      `https://cataas.com/cat?width=300&height=300&t=${Date.now()}-${i}-${Math.random()}`
+    );
+
+    urls.forEach(async (url, i) => {
+      try {
+        const base64 = await fetchAsBase64(url);
+        setCats(prev => {
+          const updated = [...prev];
+          const idx = append ? prev.length - 9 + i : i;
+          updated[idx] = { base64, loading: false };
+          return updated;
+        });
+      } catch {
+        setCats(prev => {
+          const updated = [...prev];
+          const idx = append ? prev.length - 9 + i : i;
+          updated[idx] = { base64: null, loading: false, error: true };
+          return updated;
+        });
+      }
+    });
+
+    if (append) setLoadingMore(false);
   };
 
-  useEffect(() => {
-    loadCats();
-  }, []);
-
-  // Convertir l'URL cataas en base64 immédiatement pour éviter qu'un chat différent
-  // soit rechargé lors de l'encodage (cataas retourne un chat aléatoire à chaque requête)
-  const handleCatSelect = async (url) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onload = (ev) => onSelect(ev.target.result, false);
-      reader.readAsDataURL(blob);
-    } catch {
-      // fallback : passer l'URL directement
-      onSelect(url, false);
-    }
-  };
+  useEffect(() => { loadCats(); }, []);
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -54,16 +67,6 @@ const CatGallery = ({ onSelect, selectedUrl }) => {
     reader.onload = (ev) => onSelect(ev.target.result, true);
     reader.readAsDataURL(file);
   };
-
-  if (loading) {
-    return (
-      <div className="grid grid-cols-3 gap-2">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-3">
@@ -80,20 +83,24 @@ const CatGallery = ({ onSelect, selectedUrl }) => {
 
       {/* Grille de chats */}
       <div className="grid grid-cols-3 gap-2">
-        {cats.map((url, i) => (
+        {cats.map((cat, i) => (
           <div
-            key={`${url}-${i}`}
-            className={`cat-card aspect-square ${selectedUrl === url ? 'selected' : ''}`}
-            onClick={() => handleCatSelect(url)}>
-            <img
-              src={url}
-              alt={`Chat ${i + 1}`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              onError={(e) => {
-                e.target.src = `https://cataas.com/cat?t=${Date.now()}-retry-${i}`;
-              }}
-            />
+            key={i}
+            className={`cat-card aspect-square ${selectedUrl === cat.base64 ? 'selected' : ''} ${!cat.base64 ? 'animate-pulse bg-white/5' : ''}`}
+            onClick={() => cat.base64 && onSelect(cat.base64, false)}>
+            {cat.loading && (
+              <div className="w-full h-full rounded-xl bg-white/5 animate-pulse" />
+            )}
+            {cat.error && (
+              <div className="w-full h-full rounded-xl bg-white/5 flex items-center justify-center text-xl">😿</div>
+            )}
+            {cat.base64 && (
+              <img
+                src={cat.base64}
+                alt={`Chat ${i + 1}`}
+                className="w-full h-full object-cover"
+              />
+            )}
           </div>
         ))}
       </div>
