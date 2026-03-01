@@ -122,15 +122,6 @@ const Home = () => {
             ))}
           </div>
         </div>
-
-        <div className="p-3 rounded-xl flex items-center gap-3"
-             style={{ background: 'rgba(233, 69, 96, 0.08)', border: '1px solid rgba(233, 69, 96, 0.15)' }}>
-          <Zap size={14} style={{ color: '#E94560' }} className="flex-shrink-0" />
-          <p className="text-xs text-white/50">
-            <span style={{ color: '#E94560' }} className="font-medium">Astuce : </span>
-            Essayez la clé <span className="font-mono" style={{ color: '#FF6B35' }}>"meow"</span> pour un easter egg 🐱
-          </p>
-        </div>
       </div>
 
       <Navbar />
