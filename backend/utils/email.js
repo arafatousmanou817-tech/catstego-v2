@@ -13,7 +13,11 @@ const transporter = nodemailer.createTransport({
 
 const sendVerificationEmail = async (to, code) => {
   // En mode développement ou si les variables sont celles par défaut, logguer le code
-  const isDummyConfig = !process.env.EMAIL_USER || process.env.EMAIL_USER === 'user@example.com';
+  const isDummyConfig = !process.env.EMAIL_USER || 
+    process.env.EMAIL_USER === 'user@example.com' ||
+    process.env.EMAIL_USER === 'tonemail@gmail.com' ||
+    !process.env.EMAIL_PASS ||
+    process.env.EMAIL_PASS === 'ton_mot_de_passe';
 
   if (process.env.NODE_ENV === 'development' || isDummyConfig) {
     console.log(`✉️ [SIMULATION] Verification email to ${to}: ${code}`);

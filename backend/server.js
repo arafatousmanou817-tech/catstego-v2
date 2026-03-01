@@ -15,7 +15,9 @@ app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
-  ? false
+  ? (process.env.FRONTEND_URL
+      ? [process.env.FRONTEND_URL]
+      : true) // true = même origine (frontend servi par le backend)
   : ['http://localhost:5173', 'http://localhost:3000'];
 
 const io = new Server(server, {
