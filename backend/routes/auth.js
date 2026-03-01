@@ -37,24 +37,26 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
     const avatarColor = randomColor();
     const verificationCode = generateVerificationCode();
-    const verificationExpires = new Date(Date.now() + 15 * 60000); // 15 mins
+    const verificationExpires = new Date(Date.now() + 15 * 60000);
 
-    const result = await db.query(
-      'INSERT INTO users (username, email, password_hash, avatar_color, verification_code, verification_expires) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+    await db.query(
+      'INSERT INTO users (username, email, password_hash, avatar_color, verification_code, verification_expires) VALUES ($1, $2, $3, $4, $5, $6)',
       [username, email, passwordHash, avatarColor, verificationCode, verificationExpires]
     );
-    const userId = result.rows[0].id;
 
+    // Tentative d'envoi du mail (on continue même si ça échoue, le code est loggé sur le serveur)
     await sendVerificationEmail(email, verificationCode);
 
+    const isSimulation = !process.env.EMAIL_HOST || process.env.EMAIL_USER === 'user@example.com';
     res.status(201).json({
-      message: 'Compte créé avec succès. Un code de vérification a été envoyé par email.',
-      userId,
+      message: isSimulation
+        ? `[SIMULATION] Compte créé. Code : ${verificationCode}`
+        : 'Compte créé avec succès. Un code de vérification a été envoyé.',
       email
     });
   } catch (err) {
-    console.error('Erreur register:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('🔴 Erreur register:', err.message);
+    res.status(500).json({ error: 'Erreur lors de la création du compte' });
   }
 });
 
@@ -73,12 +75,18 @@ router.post('/resend-verification', async (req, res) => {
     );
 
     if (result.rowCount === 0)
-      return res.status(404).json({ error: 'Utilisateur introuvable ou déjà vérifié' });
+      return res.status(404).json({ error: 'Compte introuvable ou déjà vérifié' });
 
     await sendVerificationEmail(email, verificationCode);
-    res.json({ message: 'Nouveau code envoyé' });
+
+    const isSimulation = !process.env.EMAIL_HOST || process.env.EMAIL_USER === 'user@example.com';
+    res.json({
+      message: isSimulation
+        ? `[SIMULATION] Nouveau code : ${verificationCode}`
+        : 'Nouveau code envoyé'
+    });
   } catch (err) {
-    console.error('Erreur resend:', err);
+    console.error('🔴 Erreur resend:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -91,7 +99,7 @@ router.post('/verify-email', async (req, res) => {
 
   try {
     const result = await db.query(
-      'SELECT id, username, email, avatar_color FROM users WHERE email = $1 AND verification_code = $2 AND verification_expires > NOW()',
+      'SELECT * FROM users WHERE email = $1 AND verification_code = $2 AND verification_expires > NOW()',
       [email, code]
     );
     const user = result.rows[0];
@@ -116,7 +124,7 @@ router.post('/verify-email', async (req, res) => {
       user: { id: user.id, username: user.username, email: user.email, avatarColor: user.avatar_color }
     });
   } catch (err) {
-    console.error('Erreur verify-email:', err);
+    console.error('🔴 Erreur verify-email:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -135,8 +143,19 @@ router.post('/login', async (req, res) => {
     if (!user)
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
 
-    if (!user.is_verified)
-      return res.status(403).json({ error: 'Veuillez vérifier votre compte avant de vous connecter', needsVerification: true, email: user.email });
+    if (!user.is_verified) {
+      // Pour faciliter le test si le mail ne part pas (pas de config SMTP)
+      const isSimulation = !process.env.EMAIL_HOST || process.env.EMAIL_USER === 'user@example.com';
+      let error = 'Compte non vérifié. Veuillez entrer le code reçu par email.';
+      if (isSimulation) {
+        error = `[SIMULATION] Compte non vérifié. Utilisez le code : ${user.verification_code}`;
+      }
+      return res.status(403).json({
+        error,
+        needsVerification: true,
+        email: user.email
+      });
+    }
 
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword)
@@ -156,7 +175,7 @@ router.post('/login', async (req, res) => {
       user: { id: user.id, username: user.username, email: user.email, avatarColor: user.avatar_color }
     });
   } catch (err) {
-    console.error('Erreur login:', err);
+    console.error('🔴 Erreur login:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
