@@ -41,8 +41,7 @@ const Register = () => {
         email: form.email,
         password: form.password
       });
-      login(data.token, data.user);
-      navigate('/home');
+      navigate('/verify-email', { state: { email: form.email } });
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur lors de l\'inscription');
     } finally {

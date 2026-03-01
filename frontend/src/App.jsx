@@ -9,6 +9,7 @@ import PushPrompt from './components/PushPrompt';
 import usePushNotifications from './hooks/usePushNotifications';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import Home from './pages/Home';
 import Encode from './pages/Encode';
 import Decode from './pages/Decode';
@@ -55,6 +56,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/home" replace />} />
         <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/home" replace />} />
+        <Route path="/verify-email" element={!isAuthenticated ? <VerifyEmail /> : <Navigate to="/home" replace />} />
         <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/encode" element={<ProtectedRoute><Encode /></ProtectedRoute>} />
         <Route path="/decode" element={<ProtectedRoute><Decode /></ProtectedRoute>} />
