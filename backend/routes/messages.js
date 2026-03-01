@@ -6,7 +6,8 @@ const { verifyToken } = require('../middleware/auth');
 // GET /api/messages/:contactId - Historique conversation
 router.get('/:contactId', verifyToken, async (req, res) => {
   const { contactId } = req.params;
-  const { page = 1, limit = 50 } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
   const offset = (page - 1) * limit;
 
   try {

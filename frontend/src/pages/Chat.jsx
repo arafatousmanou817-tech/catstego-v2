@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Send, Image, Eye, X, Lock, Unlock, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Send, Image, Eye, X, Lock, Unlock, ChevronDown, Download } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -537,6 +537,15 @@ const Chat = () => {
     sendMessage(encodedImageBase64, 'catstego_image');
   };
 
+  const handleDownloadImage = (base64Content) => {
+    const link = document.createElement('a');
+    link.href = base64Content;
+    link.download = `catstego_${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const formatTime = (dateStr) => {
     const d = new Date(dateStr);
     return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -719,15 +728,24 @@ const Chat = () => {
                           <div className="absolute bottom-0 left-0 right-0 p-1.5 flex items-center justify-between"
                                style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
                             <span className="text-xs text-white/70">🔒 CatStego</span>
-                            {!isMine && (
+                            <div className="flex gap-1">
+                              {!isMine && (
+                                <button
+                                  onClick={() => setShowDecodeModal(msg.content)}
+                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ background: 'rgba(255, 107, 53, 0.3)', color: '#FF6B35' }}>
+                                  <Eye size={10} />
+                                  Décoder
+                                </button>
+                              )}
                               <button
-                                onClick={() => setShowDecodeModal(msg.content)}
+                                onClick={() => handleDownloadImage(msg.content)}
                                 className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                style={{ background: 'rgba(255, 107, 53, 0.3)', color: '#FF6B35' }}>
-                                <Eye size={10} />
-                                Décoder
+                                style={{ background: 'rgba(255, 255, 255, 0.2)', color: 'white' }}>
+                                <Download size={10} />
+                                Télécharger
                               </button>
-                            )}
+                            </div>
                           </div>
                         </div>
                       ) : (
