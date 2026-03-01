@@ -230,6 +230,7 @@ const Chat = () => {
   const { socket, isUserOnline } = useSocket() || {};
 
   const [contacts, setContacts] = useState([]);
+  const [conversations, setConversations] = useState([]); // toutes les conversations avec dernier msg
   const [selectedContact, setSelectedContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -241,6 +242,12 @@ const Chat = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimerRef = useRef(null);
+  const selectedContactRef = useRef(null);
+
+  // Garder une ref sync de selectedContact pour les closures socket
+  useEffect(() => {
+    selectedContactRef.current = selectedContact;
+  }, [selectedContact]);
 
   // Charger depuis navigate state
   useEffect(() => {
@@ -254,6 +261,7 @@ const Chat = () => {
 
   useEffect(() => {
     loadContacts();
+    loadConversations();
   }, []);
 
   useEffect(() => {
@@ -271,13 +279,23 @@ const Chat = () => {
     if (!socket) return;
 
     socket.on('receive_message', (msg) => {
-      setMessages(prev => {
-        if (prev.some(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-      if (msg.sender_id !== selectedContact?.id) {
+      const currentContact = selectedContactRef.current;
+
+      // Si la conv est ouverte avec cet expéditeur → ajouter le message directement
+      if (currentContact && msg.sender_id === currentContact.id) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        // Marquer comme lu
+        if (socket) socket.emit('mark_read', { senderId: msg.sender_id });
+      } else {
+        // Sinon → incrémenter badge non-lu
         setUnreadCounts(prev => ({ ...prev, [msg.sender_id]: (prev[msg.sender_id] || 0) + 1 }));
       }
+
+      // Rafraîchir la liste des conversations pour faire apparaître le nouveau message
+      loadConversations();
     });
 
     socket.on('message_sent', (msg) => {
@@ -286,14 +304,15 @@ const Chat = () => {
         if (withoutTemp.some(m => m.id === msg.id)) return withoutTemp;
         return [...withoutTemp, msg];
       });
+      loadConversations();
     });
 
     socket.on('user_typing', ({ userId }) => {
-      if (userId === selectedContact?.id) setPartnerTyping(true);
+      if (userId === selectedContactRef.current?.id) setPartnerTyping(true);
     });
 
     socket.on('user_stop_typing', ({ userId }) => {
-      if (userId === selectedContact?.id) setPartnerTyping(false);
+      if (userId === selectedContactRef.current?.id) setPartnerTyping(false);
     });
 
     return () => {
@@ -302,7 +321,7 @@ const Chat = () => {
       socket.off('user_typing');
       socket.off('user_stop_typing');
     };
-  }, [socket, selectedContact]);
+  }, [socket]); // Plus de dépendance à selectedContact — on utilise la ref
 
   const loadContacts = async () => {
     try {
@@ -310,6 +329,60 @@ const Chat = () => {
       setContacts(data);
     } catch (err) {
       console.error('Erreur contacts:', err);
+    }
+  };
+
+  // Charge toutes les conversations (pas seulement les contacts)
+  const loadConversations = async () => {
+    try {
+      const [contactsRes, msgsRes] = await Promise.all([
+        axios.get('/api/contacts'),
+        axios.get('/api/messages')
+      ]);
+      setContacts(contactsRes.data);
+
+      // Merger : conversations depuis messages + contacts sans message
+      const contactsMap = {};
+      contactsRes.data.forEach(c => { contactsMap[c.id] = c; });
+
+      const convMap = {};
+      msgsRes.data.forEach(conv => {
+        const otherId = conv.other_user_id;
+        convMap[otherId] = {
+          id: otherId,
+          username: conv.other_username,
+          avatar_color: conv.other_color,
+          lastMessage: conv.content,
+          lastMessageType: conv.type,
+          lastMessageAt: conv.created_at,
+          unread: parseInt(conv.unread_count) || 0,
+          isContact: !!contactsMap[otherId]
+        };
+      });
+
+      // Ajouter contacts sans aucun message
+      contactsRes.data.forEach(c => {
+        if (!convMap[c.id]) {
+          convMap[c.id] = { ...c, lastMessage: null, lastMessageAt: null, unread: 0, isContact: true };
+        }
+      });
+
+      const sorted = Object.values(convMap).sort((a, b) => {
+        if (!a.lastMessageAt) return 1;
+        if (!b.lastMessageAt) return -1;
+        return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
+      });
+
+      setConversations(sorted);
+
+      // Sync unread counts depuis l'API
+      const unread = {};
+      msgsRes.data.forEach(conv => {
+        if (conv.unread_count > 0) unread[conv.other_user_id] = parseInt(conv.unread_count);
+      });
+      setUnreadCounts(prev => ({ ...unread, ...prev }));
+    } catch (err) {
+      console.error('Erreur conversations:', err);
     }
   };
 
@@ -411,7 +484,7 @@ const Chat = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          {contacts.length === 0 ? (
+          {conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="text-4xl mb-3">💬</div>
               <p className="text-sm font-medium text-white/60">Aucune conversation</p>
@@ -425,25 +498,34 @@ const Chat = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {contacts.map(contact => (
+              {conversations.map(conv => (
                 <button
-                  key={contact.id}
-                  onClick={() => setSelectedContact(contact)}
+                  key={conv.id}
+                  onClick={() => setSelectedContact(conv)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all hover:scale-[1.01]"
                   style={{ background: 'rgba(22, 33, 62, 0.7)', border: '1px solid rgba(255, 107, 53, 0.1)' }}>
-                  <Avatar user={contact} size={42} online={isUserOnline?.(contact.id)} />
+                  <Avatar user={conv} size={42} online={isUserOnline?.(conv.id)} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-white truncate">{contact.username}</p>
-                      {unreadCounts[contact.id] > 0 && (
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold ml-2 flex-shrink-0"
-                             style={{ background: '#E94560' }}>
-                          {unreadCounts[contact.id]}
-                        </div>
-                      )}
+                      <p className="text-sm font-semibold text-white truncate">{conv.username}</p>
+                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                        {conv.lastMessageAt && (
+                          <span className="text-xs text-white/30">{formatTime(conv.lastMessageAt)}</span>
+                        )}
+                        {(unreadCounts[conv.id] > 0) && (
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                               style={{ background: '#E94560' }}>
+                            {unreadCounts[conv.id]}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-white/40">
-                      {isUserOnline?.(contact.id) ? '🟢 En ligne' : 'Hors ligne'}
+                    <p className="text-xs text-white/40 truncate">
+                      {conv.lastMessage
+                        ? conv.lastMessageType === 'catstego_image'
+                          ? '🔒 Image CatStego'
+                          : conv.lastMessage
+                        : isUserOnline?.(conv.id) ? '🟢 En ligne' : 'Hors ligne'}
                     </p>
                   </div>
                 </button>
