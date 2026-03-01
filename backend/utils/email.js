@@ -1,4 +1,4 @@
-const SibApiV3Sdk = require('@getbrevo/brevo');
+const Brevo = require('@getbrevo/brevo');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────
@@ -14,17 +14,7 @@ if (!isConfigured) {
 }
 
 const FROM_ADDRESS = process.env.EMAIL_FROM || 'noreply@catstego.com';
-const FROM_NAME = 'CatStego 🐱';
-
-// ─────────────────────────────────────────────
-// Client Brevo
-// ─────────────────────────────────────────────
-let apiInstance = null;
-if (isConfigured) {
-  const apiClient = SibApiV3Sdk.ApiClient.instance;
-  apiClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
-  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-}
+const FROM_NAME = 'CatStego';
 
 // ─────────────────────────────────────────────
 // Template HTML
@@ -35,7 +25,6 @@ const buildVerificationHtml = (code) => `
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Vérification CatStego</title>
 </head>
 <body style="margin:0;padding:0;background:#0D0D0D;font-family:'Segoe UI',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D0D0D;padding:40px 20px;">
@@ -63,7 +52,7 @@ const buildVerificationHtml = (code) => `
                 </span>
               </div>
               <p style="margin:0;color:#606080;font-size:12px;line-height:1.6;">
-                Si tu n'as pas demandé ce code, ignore cet email — ton compte ne sera pas créé.
+                Si tu n'as pas demandé ce code, ignore cet email.
               </p>
             </td>
           </tr>
@@ -95,15 +84,31 @@ const sendVerificationEmail = async (to, code) => {
     return;
   }
 
-  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-  sendSmtpEmail.sender = { name: FROM_NAME, email: FROM_ADDRESS };
-  sendSmtpEmail.to = [{ email: to }];
-  sendSmtpEmail.subject = `${code} — Ton code de vérification CatStego`;
-  sendSmtpEmail.textContent = `Ton code de vérification CatStego est : ${code}\nIl expire dans 15 minutes.`;
-  sendSmtpEmail.htmlContent = buildVerificationHtml(code);
+  // Nouvelle API @getbrevo/brevo (fetch natif, pas de ApiClient)
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: FROM_NAME, email: FROM_ADDRESS },
+      to: [{ email: to }],
+      subject: `${code} — Ton code de vérification CatStego`,
+      textContent: `Ton code de vérification CatStego est : ${code}\nIl expire dans 15 minutes.`,
+      htmlContent: buildVerificationHtml(code),
+    }),
+  });
 
-  const response = await apiInstance.sendTransacEmail(sendSmtpEmail);
-  console.log(`✅ [EMAIL] Code envoyé à ${to} (messageId: ${response.messageId})`);
+  if (!response.ok) {
+    const err = await response.json();
+    console.error('❌ [EMAIL] Erreur Brevo :', err.message);
+    throw new Error(err.message);
+  }
+
+  const data = await response.json();
+  console.log(`✅ [EMAIL] Code envoyé à ${to} (messageId: ${data.messageId})`);
 };
 
 module.exports = { sendVerificationEmail };
