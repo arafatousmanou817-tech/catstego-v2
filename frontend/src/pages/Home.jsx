@@ -53,7 +53,7 @@ const Home = () => {
       <div className="px-5 pt-4 pb-3" style={{ background: 'rgba(13, 13, 13, 0.8)' }}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold gradient-text">CatStego V2</h1>
+            <h1 className="text-lg font-bold gradient-text">CatStego</h1>
             <div className="flex items-center gap-2">
               <div className={`w-1.5 h-1.5 rounded-full ${socketCtx?.connected ? 'bg-green-400' : 'bg-red-400'}`} />
               <span className="text-xs text-white/40">
