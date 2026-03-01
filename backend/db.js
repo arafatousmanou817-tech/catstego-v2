@@ -21,6 +21,20 @@ const initDB = async () => {
       last_seen TIMESTAMP
     );
 
+    -- Migration pour les tables existantes
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_verified') THEN
+        ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='verification_code') THEN
+        ALTER TABLE users ADD COLUMN verification_code TEXT;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='verification_expires') THEN
+        ALTER TABLE users ADD COLUMN verification_expires TIMESTAMP;
+      END IF;
+    END $$;
+
     CREATE TABLE IF NOT EXISTS contacts (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
