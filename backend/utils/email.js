@@ -1,48 +1,19 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────
 // Validation de la config au démarrage
 // ─────────────────────────────────────────────
-const isConfigured =
-  process.env.EMAIL_USER &&
-  process.env.EMAIL_PASS &&
-  process.env.EMAIL_HOST;
+const isConfigured = !!process.env.RESEND_API_KEY;
 
 if (!isConfigured) {
-  console.warn('⚠️  [EMAIL] Variables EMAIL_USER / EMAIL_PASS / EMAIL_HOST manquantes.');
+  console.warn('⚠️  [EMAIL] Variable RESEND_API_KEY manquante.');
   console.warn('   Les emails seront simulés (code visible dans les logs).');
 }
 
-// ─────────────────────────────────────────────
-// Transporter — compatible avec tes variables Railway :
-//   EMAIL_HOST=smtp.gmail.com
-//   EMAIL_PORT=465
-//   EMAIL_SECURE=true
-//   EMAIL_USER=ousmanoubounyamine@gmail.com
-//   EMAIL_PASS=jtbz azxk zxtt catf   ← App Password Google
-// ─────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: parseInt(process.env.EMAIL_PORT) || 465,
-  secure: process.env.EMAIL_SECURE === 'true',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = isConfigured ? new Resend(process.env.RESEND_API_KEY) : null;
 
-// Vérifie la connexion SMTP au démarrage (non bloquant)
-if (isConfigured) {
-  transporter.verify((error) => {
-    if (error) {
-      console.error('❌ [EMAIL] Connexion SMTP échouée :', error.message);
-      console.error('   → Vérifie EMAIL_USER et EMAIL_PASS (App Password) dans Railway.');
-    } else {
-      console.log('✅ [EMAIL] Connexion SMTP OK — prêt à envoyer des emails.');
-    }
-  });
-}
+const FROM_ADDRESS = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 
 // ─────────────────────────────────────────────
 // Template HTML
@@ -104,6 +75,7 @@ const buildVerificationHtml = (code) => `
 // Fonction principale d'envoi
 // ─────────────────────────────────────────────
 const sendVerificationEmail = async (to, code) => {
+  // Mode simulation : config manquante ou développement local
   if (!isConfigured || process.env.NODE_ENV === 'development') {
     console.log('─'.repeat(50));
     console.log('✉️  [EMAIL SIMULATION]');
@@ -113,18 +85,21 @@ const sendVerificationEmail = async (to, code) => {
     return;
   }
 
-  const mailOptions = {
-    from: `"CatStego 🐱" <${process.env.EMAIL_USER}>`,
+  const { data, error } = await resend.emails.send({
+    from: `CatStego 🐱 <${FROM_ADDRESS}>`,
     to,
     subject: `${code} — Ton code de vérification CatStego`,
     text: `Ton code de vérification CatStego est : ${code}\nIl expire dans 15 minutes.`,
     html: buildVerificationHtml(code),
-  };
+  });
 
-  // L'erreur remonte volontairement : si l'email échoue, la route /register
-  // renvoie un 500 plutôt que de créer un compte impossible à vérifier.
-  await transporter.sendMail(mailOptions);
-  console.log(`✅ [EMAIL] Code envoyé à ${to}`);
+  if (error) {
+    // Resend renvoie les erreurs dans `error` plutôt que via throw
+    console.error('❌ [EMAIL] Erreur Resend :', error.message);
+    throw new Error(error.message); // remonte vers la route /register → 500
+  }
+
+  console.log(`✅ [EMAIL] Code envoyé à ${to} (id: ${data.id})`);
 };
 
 module.exports = { sendVerificationEmail };
