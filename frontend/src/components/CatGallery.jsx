@@ -31,6 +31,21 @@ const CatGallery = ({ onSelect, selectedUrl }) => {
     loadCats();
   }, []);
 
+  // Convertir l'URL cataas en base64 immédiatement pour éviter qu'un chat différent
+  // soit rechargé lors de l'encodage (cataas retourne un chat aléatoire à chaque requête)
+  const handleCatSelect = async (url) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onload = (ev) => onSelect(ev.target.result, false);
+      reader.readAsDataURL(blob);
+    } catch {
+      // fallback : passer l'URL directement
+      onSelect(url, false);
+    }
+  };
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -69,7 +84,7 @@ const CatGallery = ({ onSelect, selectedUrl }) => {
           <div
             key={`${url}-${i}`}
             className={`cat-card aspect-square ${selectedUrl === url ? 'selected' : ''}`}
-            onClick={() => onSelect(url, false)}>
+            onClick={() => handleCatSelect(url)}>
             <img
               src={url}
               alt={`Chat ${i + 1}`}
