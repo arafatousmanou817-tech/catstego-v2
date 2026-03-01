@@ -1,7 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { NotificationProvider } from './context/NotificationContext';
 import PhoneFrame from './components/PhoneFrame';
+import ToastContainer from './components/ToastContainer';
+import PushPrompt from './components/PushPrompt';
+import usePushNotifications from './hooks/usePushNotifications';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
@@ -30,9 +35,23 @@ const ProtectedRoute = ({ children }) => {
 
 const AppRoutes = () => {
   const { isAuthenticated } = useAuth();
+  const { permission, requestPermissionAndSubscribe } = usePushNotifications(isAuthenticated);
+  const [promptDismissed, setPromptDismissed] = useState(false);
+
+  const showPrompt = isAuthenticated
+    && permission === 'default'
+    && !promptDismissed
+    && 'serviceWorker' in navigator
+    && 'PushManager' in window;
 
   return (
     <PhoneFrame>
+      {showPrompt && (
+        <PushPrompt
+          onAllow={requestPermissionAndSubscribe}
+          onDismiss={() => setPromptDismissed(true)}
+        />
+      )}
       <Routes>
         <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/home" replace />} />
         <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/home" replace />} />
@@ -52,7 +71,10 @@ const App = () => {
     <BrowserRouter>
       <AuthProvider>
         <SocketProvider>
-          <AppRoutes />
+          <NotificationProvider>
+            <AppRoutes />
+            <ToastContainer />
+          </NotificationProvider>
         </SocketProvider>
       </AuthProvider>
     </BrowserRouter>

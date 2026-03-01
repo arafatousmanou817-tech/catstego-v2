@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
+const { router: pushRouter, sendPushToUser } = require('./routes/push');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/push', pushRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '2.0.0' }));
 
@@ -80,6 +82,20 @@ io.on('connection', (socket) => {
       const receiverSocketId = onlineUsers.get(parseInt(receiverId));
       if (receiverSocketId) io.to(receiverSocketId).emit('receive_message', { ...message, tempId });
       socket.emit('message_sent', { ...message, tempId });
+
+      // Envoyer une push notification si le destinataire n'est pas sur l'app
+      const isOnline = onlineUsers.has(parseInt(receiverId));
+      if (!isOnline) {
+        const isImage = type === 'catstego_image';
+        await sendPushToUser(parseInt(receiverId), {
+          title: `🐱 ${socket.user.username}`,
+          body: isImage ? '🔒 Vous avez reçu une image CatStego' : content.slice(0, 100),
+          tag: `msg-${userId}`,
+          url: '/chat',
+          senderId: userId,
+          icon: '/cat-icon.png'
+        });
+      }
     } catch (err) {
       console.error('Erreur send_message socket:', err);
       socket.emit('message_error', { error: "Erreur lors de l'envoi", tempId });

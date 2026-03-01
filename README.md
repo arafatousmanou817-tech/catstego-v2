@@ -1,4 +1,4 @@
-# 🐱 CatStego V2 — Messages Secrets dans des Chats
+# 🐱 CatStego — Messages Secrets dans des Chats
 
 Application de **stéganographie** complète : cachez des messages secrets dans des photos de chats et partagez-les via un chat chiffré en temps réel.
 
@@ -7,7 +7,8 @@ Application de **stéganographie** complète : cachez des messages secrets dans 
 ## 🚀 Installation & Lancement
 
 ### Prérequis
-- **Node.js** v18+ 
+
+- **Node.js** v18+
 - **npm** v9+
 
 ### Étape 1 — Backend
@@ -34,22 +35,23 @@ L'app s'ouvre sur `http://localhost:5173`
 
 ## 🧱 Stack Technique
 
-| Composant | Technologie |
-|-----------|-------------|
-| Frontend | React 18 + Vite + TailwindCSS |
-| Backend | Node.js + Express |
-| Base de données | SQLite (better-sqlite3) |
-| Temps réel | Socket.IO |
-| Auth | JWT (localStorage) |
-| Stéganographie | Canvas API (LSB) |
-| Chiffrement | XOR + AES-256 (CryptoJS) |
-| Images chats | cataas.com API |
+| Composant       | Technologie                   |
+| --------------- | ----------------------------- |
+| Frontend        | React 18 + Vite + TailwindCSS |
+| Backend         | Node.js + Express             |
+| Base de données | Postgres                      |
+| Temps réel      | Socket.IO                     |
+| Auth            | JWT (localStorage)            |
+| Stéganographie  | Canvas API (LSB)              |
+| Chiffrement     | XOR + AES-256 (CryptoJS)      |
+| Images chats    | cataas.com API                |
 
 ---
 
 ## 🔐 Fonctionnalités
 
 ### 🐱 Stéganographie LSB
+
 - Choisir un chat depuis **cataas.com** ou importer depuis la galerie
 - Cacher un message avec **XOR** ou **AES-256**
 - Indicateur de force de clé (4 niveaux)
@@ -59,6 +61,7 @@ L'app s'ouvre sur `http://localhost:5173`
 - Format PNG obligatoire pour préserver les LSBs
 
 ### 💬 Chat en temps réel
+
 - Conversations privées Socket.IO
 - Envoi d'images CatStego directement dans le chat
 - Bouton "Décoder" sur les images reçues (clé jamais envoyée sur le réseau)
@@ -67,11 +70,13 @@ L'app s'ouvre sur `http://localhost:5173`
 - Statut en ligne / hors ligne
 
 ### 👥 Contacts
+
 - Recherche par username ou email
 - Ajout / suppression de contacts
 - Statut en ligne en temps réel
 
 ### 🔑 Authentification
+
 - Inscription avec validation client + serveur
 - Mots de passe hashés avec bcrypt
 - JWT stocké en localStorage (7 jours)
@@ -80,7 +85,7 @@ L'app s'ouvre sur `http://localhost:5173`
 
 ## 📁 Structure du projet
 
-```
+```txt
 catstego-v2/
 ├── backend/
 │   ├── server.js          # Express + Socket.IO
@@ -121,18 +126,6 @@ messages  — id, sender_id, receiver_id, content, type, is_read, created_at
 
 ---
 
-## ⚙️ Variables d'environnement
-
-Fichier `backend/.env` :
-
-```
-JWT_SECRET=catstego_secret_key_2024
-PORT=3001
-DB_PATH=./catstego.db
-```
-
----
-
 ## 🎨 Design
 
 - Thème sombre avec **phone frame** mobile-first
@@ -150,7 +143,3 @@ DB_PATH=./catstego.db
 - Décodage 100% côté client (Canvas API)
 - Mots de passe hashés avec **bcrypt** (coût 12)
 - JWT signé avec secret dédié
-
----
-
-*CatStego V2 — Vos secrets méritent d'être mignons 🐱*
