@@ -12,38 +12,34 @@ const randomColor = () => COLORS[Math.floor(Math.random() * COLORS.length)];
 router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
 
-  if (!username || !email || !password) {
+  if (!username || !email || !password)
     return res.status(400).json({ error: 'Tous les champs sont obligatoires' });
-  }
-
-  if (username.length < 3) {
-    return res.status(400).json({ error: 'Le nom d\'utilisateur doit faire au moins 3 caractères' });
-  }
-
-  if (password.length < 6) {
+  if (username.length < 3)
+    return res.status(400).json({ error: "Le nom d'utilisateur doit faire au moins 3 caractères" });
+  if (password.length < 6)
     return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return res.status(400).json({ error: 'Email invalide' });
-  }
 
   try {
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
-    if (existingUser) {
-      return res.status(409).json({ error: 'Email ou nom d\'utilisateur déjà utilisé' });
-    }
+    const existing = await db.query(
+      'SELECT id FROM users WHERE email = $1 OR username = $2',
+      [email, username]
+    );
+    if (existing.rows.length > 0)
+      return res.status(409).json({ error: "Email ou nom d'utilisateur déjà utilisé" });
 
     const passwordHash = await bcrypt.hash(password, 12);
     const avatarColor = randomColor();
 
-    const result = db.prepare(
-      'INSERT INTO users (username, email, password_hash, avatar_color) VALUES (?, ?, ?, ?)'
-    ).run(username, email, passwordHash, avatarColor);
+    const result = await db.query(
+      'INSERT INTO users (username, email, password_hash, avatar_color) VALUES ($1, $2, $3, $4) RETURNING id',
+      [username, email, passwordHash, avatarColor]
+    );
+    const userId = result.rows[0].id;
 
     const token = jwt.sign(
-      { id: result.lastInsertRowid, username, email, avatarColor },
+      { id: userId, username, email, avatarColor },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -51,7 +47,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Compte créé avec succès',
       token,
-      user: { id: result.lastInsertRowid, username, email, avatarColor }
+      user: { id: userId, username, email, avatarColor }
     });
   } catch (err) {
     console.error('Erreur register:', err);
@@ -63,22 +59,21 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (!email || !password)
     return res.status(400).json({ error: 'Email et mot de passe requis' });
-  }
 
   try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+
+    if (!user)
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-    }
 
     const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) {
+    if (!validPassword)
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-    }
 
-    db.prepare('UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+    await db.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [user.id]);
 
     const token = jwt.sign(
       { id: user.id, username: user.username, email: user.email, avatarColor: user.avatar_color },
@@ -89,12 +84,7 @@ router.post('/login', async (req, res) => {
     res.json({
       message: 'Connexion réussie',
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        avatarColor: user.avatar_color
-      }
+      user: { id: user.id, username: user.username, email: user.email, avatarColor: user.avatar_color }
     });
   } catch (err) {
     console.error('Erreur login:', err);

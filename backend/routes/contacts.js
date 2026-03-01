@@ -3,47 +3,46 @@ const router = express.Router();
 const db = require('../db');
 const { verifyToken } = require('../middleware/auth');
 
-// GET /api/contacts - Liste mes contacts
-router.get('/', verifyToken, (req, res) => {
+// GET /api/contacts
+router.get('/', verifyToken, async (req, res) => {
   try {
-    const contacts = db.prepare(`
+    const result = await db.query(`
       SELECT u.id, u.username, u.email, u.avatar_color, u.last_seen, c.created_at as added_at
       FROM contacts c
       JOIN users u ON u.id = c.contact_id
-      WHERE c.user_id = ?
+      WHERE c.user_id = $1
       ORDER BY u.username ASC
-    `).all(req.user.id);
-
-    res.json(contacts);
+    `, [req.user.id]);
+    res.json(result.rows);
   } catch (err) {
     console.error('Erreur get contacts:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// GET /api/contacts/search?q=xxx - Chercher des utilisateurs
-router.get('/search', verifyToken, (req, res) => {
+// GET /api/contacts/search?q=xxx
+router.get('/search', verifyToken, async (req, res) => {
   const { q } = req.query;
-  if (!q || q.length < 2) {
+  if (!q || q.length < 2)
     return res.status(400).json({ error: 'Recherche trop courte' });
-  }
 
   try {
-    const users = db.prepare(`
+    const users = await db.query(`
       SELECT id, username, email, avatar_color
       FROM users
-      WHERE (username LIKE ? OR email LIKE ?) AND id != ?
+      WHERE (username ILIKE $1 OR email ILIKE $1) AND id != $2
       LIMIT 10
-    `).all(`%${q}%`, `%${q}%`, req.user.id);
+    `, [`%${q}%`, req.user.id]);
 
-    // Indiquer si déjà dans les contacts
-    const contactIds = db.prepare(
-      'SELECT contact_id FROM contacts WHERE user_id = ?'
-    ).all(req.user.id).map(c => c.contact_id);
+    const contactIds = await db.query(
+      'SELECT contact_id FROM contacts WHERE user_id = $1',
+      [req.user.id]
+    );
+    const contactIdSet = new Set(contactIds.rows.map(c => c.contact_id));
 
-    const result = users.map(u => ({
+    const result = users.rows.map(u => ({
       ...u,
-      isContact: contactIds.includes(u.id)
+      isContact: contactIdSet.has(u.id)
     }));
 
     res.json(result);
@@ -53,51 +52,51 @@ router.get('/search', verifyToken, (req, res) => {
   }
 });
 
-// POST /api/contacts/add - Ajouter un contact
-router.post('/add', verifyToken, (req, res) => {
+// POST /api/contacts/add
+router.post('/add', verifyToken, async (req, res) => {
   const { contactId } = req.body;
 
-  if (!contactId) {
+  if (!contactId)
     return res.status(400).json({ error: 'contactId requis' });
-  }
-
-  if (contactId === req.user.id) {
+  if (parseInt(contactId) === req.user.id)
     return res.status(400).json({ error: 'Vous ne pouvez pas vous ajouter vous-même' });
-  }
 
   try {
-    const targetUser = db.prepare('SELECT id, username, email, avatar_color FROM users WHERE id = ?').get(contactId);
-    if (!targetUser) {
+    const targetUser = await db.query(
+      'SELECT id, username, email, avatar_color FROM users WHERE id = $1',
+      [contactId]
+    );
+    if (targetUser.rows.length === 0)
       return res.status(404).json({ error: 'Utilisateur introuvable' });
-    }
 
-    const existing = db.prepare(
-      'SELECT id FROM contacts WHERE user_id = ? AND contact_id = ?'
-    ).get(req.user.id, contactId);
-
-    if (existing) {
+    const existing = await db.query(
+      'SELECT id FROM contacts WHERE user_id = $1 AND contact_id = $2',
+      [req.user.id, contactId]
+    );
+    if (existing.rows.length > 0)
       return res.status(409).json({ error: 'Déjà dans vos contacts' });
-    }
 
-    db.prepare('INSERT INTO contacts (user_id, contact_id) VALUES (?, ?)').run(req.user.id, contactId);
+    await db.query(
+      'INSERT INTO contacts (user_id, contact_id) VALUES ($1, $2)',
+      [req.user.id, contactId]
+    );
 
-    res.status(201).json({ message: 'Contact ajouté', contact: targetUser });
+    res.status(201).json({ message: 'Contact ajouté', contact: targetUser.rows[0] });
   } catch (err) {
     console.error('Erreur add contact:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// DELETE /api/contacts/:id - Supprimer un contact
-router.delete('/:id', verifyToken, (req, res) => {
+// DELETE /api/contacts/:id
+router.delete('/:id', verifyToken, async (req, res) => {
   try {
-    const result = db.prepare(
-      'DELETE FROM contacts WHERE user_id = ? AND contact_id = ?'
-    ).run(req.user.id, req.params.id);
-
-    if (result.changes === 0) {
+    const result = await db.query(
+      'DELETE FROM contacts WHERE user_id = $1 AND contact_id = $2',
+      [req.user.id, req.params.id]
+    );
+    if (result.rowCount === 0)
       return res.status(404).json({ error: 'Contact introuvable' });
-    }
 
     res.json({ message: 'Contact supprimé' });
   } catch (err) {
