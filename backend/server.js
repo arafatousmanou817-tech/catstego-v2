@@ -10,6 +10,8 @@ const db = require('./db');
 const { router: pushRouter, sendPushToUser } = require('./routes/push');
 
 const app = express();
+// Indiquer à Express qu'il est derrière un proxy (Railway, etc.) pour express-rate-limit
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
