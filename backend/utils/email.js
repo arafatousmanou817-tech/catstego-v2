@@ -7,43 +7,45 @@ require('dotenv').config();
 const isConfigured =
   process.env.EMAIL_USER &&
   process.env.EMAIL_PASS &&
-  process.env.EMAIL_USER !== 'tonemail@gmail.com';
+  process.env.EMAIL_HOST;
 
 if (!isConfigured) {
-  console.warn('⚠️  [EMAIL] Variables EMAIL_USER / EMAIL_PASS manquantes ou par défaut.');
+  console.warn('⚠️  [EMAIL] Variables EMAIL_USER / EMAIL_PASS / EMAIL_HOST manquantes.');
   console.warn('   Les emails seront simulés (code visible dans les logs).');
 }
 
 // ─────────────────────────────────────────────
-// Transporter Gmail avec App Password
-// Prérequis :
-//   1. Activer la validation en 2 étapes sur ton compte Google
-//   2. Aller sur https://myaccount.google.com/apppasswords
-//   3. Créer un "Mot de passe d'application" → copier le code 16 caractères
-//   4. Dans Railway : EMAIL_USER=tonemail@gmail.com  EMAIL_PASS=xxxx xxxx xxxx xxxx
+// Transporter — compatible avec tes variables Railway :
+//   EMAIL_HOST=smtp.gmail.com
+//   EMAIL_PORT=465
+//   EMAIL_SECURE=true
+//   EMAIL_USER=ousmanoubounyamine@gmail.com
+//   EMAIL_PASS=jtbz azxk zxtt catf   ← App Password Google
 // ─────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Utilise directement le service Gmail (plus simple que host/port)
+  host: process.env.EMAIL_HOST,
+  port: parseInt(process.env.EMAIL_PORT) || 465,
+  secure: process.env.EMAIL_SECURE === 'true',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // App Password (pas ton vrai mot de passe Google)
+    pass: process.env.EMAIL_PASS,
   },
 });
 
-// Vérifie la connexion SMTP au démarrage du serveur (non bloquant)
+// Vérifie la connexion SMTP au démarrage (non bloquant)
 if (isConfigured) {
   transporter.verify((error) => {
     if (error) {
-      console.error('❌ [EMAIL] Connexion SMTP Gmail échouée :', error.message);
+      console.error('❌ [EMAIL] Connexion SMTP échouée :', error.message);
       console.error('   → Vérifie EMAIL_USER et EMAIL_PASS (App Password) dans Railway.');
     } else {
-      console.log('✅ [EMAIL] Connexion SMTP Gmail OK — prêt à envoyer des emails.');
+      console.log('✅ [EMAIL] Connexion SMTP OK — prêt à envoyer des emails.');
     }
   });
 }
 
 // ─────────────────────────────────────────────
-// Template HTML de l'email de vérification
+// Template HTML
 // ─────────────────────────────────────────────
 const buildVerificationHtml = (code) => `
 <!DOCTYPE html>
@@ -59,47 +61,30 @@ const buildVerificationHtml = (code) => `
       <td align="center">
         <table width="480" cellpadding="0" cellspacing="0"
                style="background:#1A1A2E;border-radius:16px;overflow:hidden;border:1px solid #2a2a4a;">
-
-          <!-- Header -->
           <tr>
             <td align="center" style="padding:32px 24px 16px;background:linear-gradient(135deg,#FF6B35,#E94560);">
               <div style="font-size:42px;margin-bottom:8px;">🐱</div>
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">
-                CatStego
-              </h1>
-              <p style="margin:4px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">
-                Messages secrets dans des chats
-              </p>
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">CatStego</h1>
+              <p style="margin:4px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">Messages secrets dans des chats</p>
             </td>
           </tr>
-
-          <!-- Body -->
           <tr>
             <td style="padding:32px 32px 24px;">
-              <h2 style="margin:0 0 12px;color:#ffffff;font-size:18px;font-weight:600;">
-                Vérification de ton compte
-              </h2>
+              <h2 style="margin:0 0 12px;color:#ffffff;font-size:18px;font-weight:600;">Vérification de ton compte</h2>
               <p style="margin:0 0 24px;color:#a0a0b8;font-size:14px;line-height:1.6;">
                 Utilise le code ci-dessous pour confirmer ton adresse email.
                 Il expire dans <strong style="color:#FF6B35;">15 minutes</strong>.
               </p>
-
-              <!-- Code box -->
-              <div style="background:#0D0D0D;border:2px solid #FF6B35;border-radius:12px;
-                          padding:20px;text-align:center;margin-bottom:24px;">
-                <span style="font-size:38px;font-weight:700;letter-spacing:12px;
-                             color:#FF6B35;font-family:'Courier New',monospace;">
+              <div style="background:#0D0D0D;border:2px solid #FF6B35;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px;">
+                <span style="font-size:38px;font-weight:700;letter-spacing:12px;color:#FF6B35;font-family:'Courier New',monospace;">
                   ${code}
                 </span>
               </div>
-
-              <p style="margin:0;color:#6060808;font-size:12px;line-height:1.6;color:#606080;">
+              <p style="margin:0;color:#606080;font-size:12px;line-height:1.6;">
                 Si tu n'as pas demandé ce code, ignore cet email — ton compte ne sera pas créé.
               </p>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td style="padding:16px 32px 24px;border-top:1px solid #2a2a4a;">
               <p style="margin:0;color:#404060;font-size:11px;text-align:center;">
@@ -107,7 +92,6 @@ const buildVerificationHtml = (code) => `
               </p>
             </td>
           </tr>
-
         </table>
       </td>
     </tr>
@@ -120,10 +104,9 @@ const buildVerificationHtml = (code) => `
 // Fonction principale d'envoi
 // ─────────────────────────────────────────────
 const sendVerificationEmail = async (to, code) => {
-  // Mode simulation : config manquante ou env de développement
   if (!isConfigured || process.env.NODE_ENV === 'development') {
     console.log('─'.repeat(50));
-    console.log(`✉️  [EMAIL SIMULATION]`);
+    console.log('✉️  [EMAIL SIMULATION]');
     console.log(`   Destinataire : ${to}`);
     console.log(`   Code         : ${code}`);
     console.log('─'.repeat(50));
@@ -138,8 +121,8 @@ const sendVerificationEmail = async (to, code) => {
     html: buildVerificationHtml(code),
   };
 
-  // En production, on laisse l'erreur remonter pour que la route renvoie un 500
-  // plutôt que de créer silencieusement un compte non vérifiable.
+  // L'erreur remonte volontairement : si l'email échoue, la route /register
+  // renvoie un 500 plutôt que de créer un compte impossible à vérifier.
   await transporter.sendMail(mailOptions);
   console.log(`✅ [EMAIL] Code envoyé à ${to}`);
 };
