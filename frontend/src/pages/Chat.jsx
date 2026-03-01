@@ -729,15 +729,13 @@ const Chat = () => {
                                style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
                             <span className="text-xs text-white/70">🔒</span>
                             <div className="flex gap-1">
-                              {!isMine && (
-                                <button
-                                  onClick={() => setShowDecodeModal(msg.content)}
-                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                  style={{ background: 'rgba(255, 107, 53, 0.3)', color: '#FF6B35' }}>
-                                  <Eye size={10} />
-                                  Décoder
-                                </button>
-                              )}
+                              <button
+                                onClick={() => setShowDecodeModal(msg.content)}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                style={{ background: 'rgba(255, 107, 53, 0.3)', color: '#FF6B35' }}>
+                                <Eye size={10} />
+                                Décoder
+                              </button>
                               <button
                                 onClick={() => handleDownloadImage(msg.content)}
                                 className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
