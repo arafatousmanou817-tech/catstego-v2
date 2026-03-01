@@ -63,7 +63,11 @@ const sendPushToUser = async (userId, payload) => {
         keys: { p256dh: sub.p256dh, auth: sub.auth }
       };
       try {
-        await webpush.sendNotification(subscription, JSON.stringify(payload));
+        const securePayload = { ...payload };
+        if (payload.body && !payload.body.startsWith('🔒')) {
+          securePayload.body = '🔒 Nouveau message reçu';
+        }
+        await webpush.sendNotification(subscription, JSON.stringify(securePayload));
       } catch (err) {
         // Subscription expirée → supprimer
         if (err.statusCode === 410 || err.statusCode === 404) {

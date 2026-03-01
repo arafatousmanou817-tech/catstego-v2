@@ -65,6 +65,12 @@ export const NotificationProvider = ({ children }) => {
     });
   }, []);
 
+  const setUnreadCounts = useCallback((counts) => {
+    setUnreadByUser(counts);
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    setTotalUnread(total);
+  }, []);
+
   const setOpenChatUserId = useCallback((userId) => {
     openChatUserIdRef.current = userId;
     if (userId) markAsRead(userId);
@@ -77,6 +83,7 @@ export const NotificationProvider = ({ children }) => {
       totalUnread,
       unreadByUser,
       markAsRead,
+      setUnreadCounts,
       setOpenChatUserId
     }}>
       {children}
