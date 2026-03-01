@@ -1,19 +1,30 @@
-const { Resend } = require('resend');
+const SibApiV3Sdk = require('@getbrevo/brevo');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────
 // Validation de la config au démarrage
 // ─────────────────────────────────────────────
-const isConfigured = !!process.env.RESEND_API_KEY;
+const isConfigured = !!process.env.BREVO_API_KEY;
 
 if (!isConfigured) {
-  console.warn('⚠️  [EMAIL] Variable RESEND_API_KEY manquante.');
+  console.warn('⚠️  [EMAIL] Variable BREVO_API_KEY manquante.');
   console.warn('   Les emails seront simulés (code visible dans les logs).');
+} else {
+  console.log('✅ [EMAIL] Brevo configuré — prêt à envoyer des emails.');
 }
 
-const resend = isConfigured ? new Resend(process.env.RESEND_API_KEY) : null;
+const FROM_ADDRESS = process.env.EMAIL_FROM || 'noreply@catstego.com';
+const FROM_NAME = 'CatStego 🐱';
 
-const FROM_ADDRESS = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+// ─────────────────────────────────────────────
+// Client Brevo
+// ─────────────────────────────────────────────
+let apiInstance = null;
+if (isConfigured) {
+  const apiClient = SibApiV3Sdk.ApiClient.instance;
+  apiClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+}
 
 // ─────────────────────────────────────────────
 // Template HTML
@@ -75,7 +86,6 @@ const buildVerificationHtml = (code) => `
 // Fonction principale d'envoi
 // ─────────────────────────────────────────────
 const sendVerificationEmail = async (to, code) => {
-  // Mode simulation : config manquante ou développement local
   if (!isConfigured || process.env.NODE_ENV === 'development') {
     console.log('─'.repeat(50));
     console.log('✉️  [EMAIL SIMULATION]');
@@ -85,21 +95,15 @@ const sendVerificationEmail = async (to, code) => {
     return;
   }
 
-  const { data, error } = await resend.emails.send({
-    from: `CatStego 🐱 <${FROM_ADDRESS}>`,
-    to,
-    subject: `${code} — Ton code de vérification CatStego`,
-    text: `Ton code de vérification CatStego est : ${code}\nIl expire dans 15 minutes.`,
-    html: buildVerificationHtml(code),
-  });
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+  sendSmtpEmail.sender = { name: FROM_NAME, email: FROM_ADDRESS };
+  sendSmtpEmail.to = [{ email: to }];
+  sendSmtpEmail.subject = `${code} — Ton code de vérification CatStego`;
+  sendSmtpEmail.textContent = `Ton code de vérification CatStego est : ${code}\nIl expire dans 15 minutes.`;
+  sendSmtpEmail.htmlContent = buildVerificationHtml(code);
 
-  if (error) {
-    // Resend renvoie les erreurs dans `error` plutôt que via throw
-    console.error('❌ [EMAIL] Erreur Resend :', error.message);
-    throw new Error(error.message); // remonte vers la route /register → 500
-  }
-
-  console.log(`✅ [EMAIL] Code envoyé à ${to} (id: ${data.id})`);
+  const response = await apiInstance.sendTransacEmail(sendSmtpEmail);
+  console.log(`✅ [EMAIL] Code envoyé à ${to} (messageId: ${response.messageId})`);
 };
 
 module.exports = { sendVerificationEmail };
