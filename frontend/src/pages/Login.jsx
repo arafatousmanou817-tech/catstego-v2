@@ -44,7 +44,7 @@ const Login = () => {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         <div className="mb-8 text-center animate-slide-up">
           <div className="text-7xl mb-4 animate-cat-bounce">🐱</div>
-          <h1 className="text-3xl font-bold gradient-text mb-1">CatStego V2</h1>
+          <h1 className="text-3xl font-bold gradient-text mb-1">CatStego</h1>
           <p className="text-sm text-white/40">Vos secrets, cachés dans des chats</p>
         </div>
 
