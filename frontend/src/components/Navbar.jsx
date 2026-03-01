@@ -1,17 +1,19 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Lock, Unlock, MessageCircle, Users, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
-const Navbar = ({ unreadCount = 0 }) => {
+const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
+  const { totalUnread } = useNotifications() || {};
 
   const tabs = [
     { path: '/home', icon: Home, label: 'Accueil' },
     { path: '/encode', icon: Lock, label: 'Cacher' },
     { path: '/decode', icon: Unlock, label: 'Révéler' },
-    { path: '/chat', icon: MessageCircle, label: 'Chat', badge: unreadCount },
+    { path: '/chat', icon: MessageCircle, label: 'Chat', badge: totalUnread },
     { path: '/contacts', icon: Users, label: 'Contacts' },
   ];
 
