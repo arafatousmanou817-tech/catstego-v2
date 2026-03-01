@@ -4,6 +4,7 @@ import { ArrowLeft, Send, Image, Eye, X, Lock, Unlock, ChevronDown } from 'lucid
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { useNotifications } from '../context/NotificationContext';
 import Navbar from '../components/Navbar';
 import CatGallery from '../components/CatGallery';
 import KeyStrength from '../components/KeyStrength';
@@ -228,6 +229,7 @@ const Chat = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { socket, isUserOnline } = useSocket() || {};
+  const { setOpenChatUserId, markAsRead } = useNotifications() || {};
 
   const [contacts, setContacts] = useState([]);
   const [conversations, setConversations] = useState([]); // toutes les conversations avec dernier msg
@@ -266,7 +268,10 @@ const Chat = () => {
 
   useEffect(() => {
     if (selectedContact) {
+      setOpenChatUserId?.(selectedContact.id);
       loadMessages(selectedContact.id);
+    } else {
+      setOpenChatUserId?.(null);
     }
   }, [selectedContact]);
 
