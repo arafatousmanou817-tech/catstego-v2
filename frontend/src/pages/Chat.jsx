@@ -229,7 +229,7 @@ const Chat = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { socket, isUserOnline } = useSocket() || {};
-  const { setOpenChatUserId, markAsRead } = useNotifications() || {};
+  const { setOpenChatUserId, markAsRead, unreadByUser, addToast, setUnreadCounts } = useNotifications() || {};
 
   const [contacts, setContacts] = useState([]);
   const [conversations, setConversations] = useState([]); // toutes les conversations avec dernier msg
@@ -240,8 +240,11 @@ const Chat = () => {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [showDecodeModal, setShowDecodeModal] = useState(null);
   const [showEncodeModal, setShowEncodeModal] = useState(false);
-  const [unreadCounts, setUnreadCounts] = useState({});
+  const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const messagesEndRef = useRef(null);
   const typingTimerRef = useRef(null);
   const selectedContactRef = useRef(null);
@@ -269,7 +272,9 @@ const Chat = () => {
   useEffect(() => {
     if (selectedContact) {
       setOpenChatUserId?.(selectedContact.id);
-      loadMessages(selectedContact.id);
+      setPage(1);
+      setHasMore(true);
+      loadMessages(selectedContact.id, 1);
     } else {
       setOpenChatUserId?.(null);
     }
@@ -283,6 +288,30 @@ const Chat = () => {
   useEffect(() => {
     if (!socket) return;
 
+    const updateConversationWithNewMessage = (msg) => {
+      setConversations(prev => {
+        const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+        const existingConvIdx = prev.findIndex(c => c.id === otherId);
+
+        const updatedConv = {
+          id: otherId,
+          username: msg.sender_id === user.id ? selectedContactRef.current?.username : msg.sender_username,
+          avatar_color: msg.sender_id === user.id ? selectedContactRef.current?.avatar_color : msg.sender_color,
+          lastMessage: msg.content,
+          lastMessageType: msg.type,
+          lastMessageAt: msg.created_at,
+          unread: (prev[existingConvIdx]?.unread || 0) + (msg.sender_id !== user.id && selectedContactRef.current?.id !== msg.sender_id ? 1 : 0),
+          isContact: prev[existingConvIdx]?.isContact ?? true
+        };
+
+        let newConvs = [...prev];
+        if (existingConvIdx > -1) {
+          newConvs.splice(existingConvIdx, 1);
+        }
+        return [updatedConv, ...newConvs];
+      });
+    };
+
     socket.on('receive_message', (msg) => {
       const currentContact = selectedContactRef.current;
 
@@ -294,13 +323,9 @@ const Chat = () => {
         });
         // Marquer comme lu
         if (socket) socket.emit('mark_read', { senderId: msg.sender_id });
-      } else {
-        // Sinon → incrémenter badge non-lu
-        setUnreadCounts(prev => ({ ...prev, [msg.sender_id]: (prev[msg.sender_id] || 0) + 1 }));
       }
 
-      // Rafraîchir la liste des conversations pour faire apparaître le nouveau message
-      loadConversations();
+      updateConversationWithNewMessage(msg);
     });
 
     socket.on('message_sent', (msg) => {
@@ -309,7 +334,7 @@ const Chat = () => {
         if (withoutTemp.some(m => m.id === msg.id)) return withoutTemp;
         return [...withoutTemp, msg];
       });
-      loadConversations();
+      updateConversationWithNewMessage(msg);
     });
 
     socket.on('user_typing', ({ userId }) => {
@@ -320,11 +345,24 @@ const Chat = () => {
       if (userId === selectedContactRef.current?.id) setPartnerTyping(false);
     });
 
+    socket.on('messages_read', ({ byUserId }) => {
+      if (byUserId === selectedContactRef.current?.id) {
+        setMessages(prev => prev.map(m => m.receiver_id === byUserId ? { ...m, is_read: 1 } : m));
+      }
+    });
+
+    socket.on('messages_marked_read', ({ senderId }) => {
+      markAsRead?.(senderId);
+      setConversations(prev => prev.map(c => c.id === senderId ? { ...c, unread: 0 } : c));
+    });
+
     return () => {
       socket.off('receive_message');
       socket.off('message_sent');
       socket.off('user_typing');
       socket.off('user_stop_typing');
+      socket.off('messages_read');
+      socket.off('messages_marked_read');
     };
   }, [socket]); // Plus de dépendance à selectedContact — on utilise la ref
 
@@ -334,11 +372,13 @@ const Chat = () => {
       setContacts(data);
     } catch (err) {
       console.error('Erreur contacts:', err);
+      addToast?.({ content: 'Erreur lors du chargement des contacts', type: 'error' });
     }
   };
 
   // Charge toutes les conversations (pas seulement les contacts)
   const loadConversations = async () => {
+    setLoadingConversations(true);
     try {
       const [contactsRes, msgsRes] = await Promise.all([
         axios.get('/api/contacts'),
@@ -380,29 +420,53 @@ const Chat = () => {
 
       setConversations(sorted);
 
-      // Sync unread counts depuis l'API
-      const unread = {};
+      // Sync unread counts to NotificationContext
+      const unreadMap = {};
       msgsRes.data.forEach(conv => {
-        if (conv.unread_count > 0) unread[conv.other_user_id] = parseInt(conv.unread_count);
+        if (conv.unread_count > 0) unreadMap[conv.other_user_id] = parseInt(conv.unread_count);
       });
-      setUnreadCounts(prev => ({ ...unread, ...prev }));
+      setUnreadCounts?.(unreadMap);
     } catch (err) {
       console.error('Erreur conversations:', err);
+      addToast?.({ content: 'Impossible de charger les conversations', type: 'error' });
+    } finally {
+      setLoadingConversations(false);
     }
   };
 
-  const loadMessages = async (contactId) => {
-    setLoadingMessages(true);
+  const loadMessages = async (contactId, pageNum = 1, append = false) => {
+    if (append) setLoadingMore(true);
+    else setLoadingMessages(true);
+
     try {
-      const { data } = await axios.get(`/api/messages/${contactId}`);
-      setMessages(data);
-      setUnreadCounts(prev => ({ ...prev, [contactId]: 0 }));
-      if (socket) socket.emit('mark_read', { senderId: contactId });
+      const { data } = await axios.get(`/api/messages/${contactId}?page=${pageNum}&limit=20`);
+
+      if (append) {
+        setMessages(prev => [...data, ...prev]);
+      } else {
+        setMessages(data);
+      }
+
+      if (data.length < 20) setHasMore(false);
+
+      if (pageNum === 1) {
+        markAsRead?.(contactId);
+        if (socket) socket.emit('mark_read', { senderId: contactId });
+      }
     } catch (err) {
       console.error('Erreur messages:', err);
+      addToast?.({ content: 'Erreur lors du chargement des messages', type: 'error' });
     } finally {
       setLoadingMessages(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    if (!selectedContact || loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadMessages(selectedContact.id, nextPage, true);
   };
 
   const sendMessage = (content, type = 'text') => {
@@ -431,6 +495,18 @@ const Chat = () => {
       tempId
     });
   };
+
+  useEffect(() => {
+    const handleMessageError = ({ error, tempId }) => {
+      setMessages(prev => prev.filter(m => m.tempId !== tempId));
+      addToast?.({ content: error, type: 'error' });
+    };
+
+    if (socket) {
+      socket.on('message_error', handleMessageError);
+      return () => socket.off('message_error', handleMessageError);
+    }
+  }, [socket, addToast]);
 
   const handleSendText = () => {
     if (!inputText.trim()) return;
@@ -489,7 +565,19 @@ const Chat = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          {conversations.length === 0 ? (
+          {loadingConversations && conversations.length === 0 ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 animate-pulse">
+                  <div className="w-10 h-10 rounded-full bg-white/10" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-1/3 bg-white/10 rounded" />
+                    <div className="h-2 w-2/3 bg-white/10 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="text-4xl mb-3">💬</div>
               <p className="text-sm font-medium text-white/60">Aucune conversation</p>
@@ -517,10 +605,10 @@ const Chat = () => {
                         {conv.lastMessageAt && (
                           <span className="text-xs text-white/30">{formatTime(conv.lastMessageAt)}</span>
                         )}
-                        {(unreadCounts[conv.id] > 0) && (
+                        {(unreadByUser?.[conv.id] > 0) && (
                           <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
                                style={{ background: '#E94560' }}>
-                            {unreadCounts[conv.id]}
+                            {unreadByUser[conv.id]}
                           </div>
                         )}
                       </div>
@@ -539,7 +627,7 @@ const Chat = () => {
           )}
         </div>
 
-        <Navbar unreadCount={Object.values(unreadCounts).reduce((a, b) => a + b, 0)} />
+        <Navbar unreadCount={Object.values(unreadByUser || {}).reduce((a, b) => a + b, 0)} />
       </div>
     );
   }
@@ -592,6 +680,17 @@ const Chat = () => {
           </div>
         ) : (
           <>
+            {hasMore && (
+              <div className="flex justify-center py-2">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                  style={{ background: 'rgba(255, 107, 53, 0.1)', color: '#FF6B35', border: '1px solid rgba(255, 107, 53, 0.2)' }}>
+                  {loadingMore ? 'Chargement...' : 'Voir les messages précédents'}
+                </button>
+              </div>
+            )}
             {messages.map((msg, idx) => {
               const isMine = msg.sender_id === user.id;
               const isImage = msg.type === 'catstego_image';
@@ -616,7 +715,7 @@ const Chat = () => {
                                border: `2px solid ${isMine ? 'rgba(255, 107, 53, 0.4)' : 'rgba(255,255,255,0.1)'}`,
                                opacity: msg.pending ? 0.7 : 1
                              }}>
-                          <img src={msg.content} alt="CatStego" className="max-w-[180px] rounded-xl" />
+                          <img src={msg.content} alt="CatStego" className="max-w-[180px] rounded-xl" loading="lazy" />
                           <div className="absolute bottom-0 left-0 right-0 p-1.5 flex items-center justify-between"
                                style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
                             <span className="text-xs text-white/70">🔒 CatStego</span>
@@ -639,7 +738,7 @@ const Chat = () => {
                       )}
                       <div className={`flex items-center gap-1 text-xs text-white/30 ${isMine ? 'flex-row-reverse' : ''}`}>
                         <span>{formatTime(msg.created_at)}</span>
-                        {isMine && <span>{msg.pending ? '⏳' : '✓'}</span>}
+                        {isMine && <span>{msg.pending ? '⏳' : (msg.is_read === 1 ? '✓✓' : '✓')}</span>}
                       </div>
                     </div>
                   </div>

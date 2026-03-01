@@ -3,9 +3,9 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const { COLORS } = require('../config');
 require('dotenv').config();
 
-const COLORS = ['#FF6B35', '#E94560', '#7B2FBE', '#00C9A7', '#F7C59F', '#3A86FF'];
 const randomColor = () => COLORS[Math.floor(Math.random() * COLORS.length)];
 
 // POST /api/auth/register

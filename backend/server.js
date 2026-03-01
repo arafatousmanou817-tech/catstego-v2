@@ -5,6 +5,7 @@ const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { router: pushRouter, sendPushToUser } = require('./routes/push');
 
@@ -24,6 +25,15 @@ app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 requests per `window`
+  message: { error: 'Trop de tentatives, veuillez réessayer plus tard.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/messages', require('./routes/messages'));
@@ -67,6 +77,12 @@ io.on('connection', (socket) => {
 
   socket.on('send_message', async (data) => {
     const { receiverId, content, type = 'text', tempId } = data;
+
+    // Validation de taille pour les images (max 10MB)
+    if (type === 'catstego_image' && content && content.length > 10 * 1024 * 1024 * 1.33) {
+      return socket.emit('message_error', { error: "L'image est trop volumineuse (max 10Mo)", tempId });
+    }
+
     try {
       const result = await db.query(
         'INSERT INTO messages (sender_id, receiver_id, content, type) VALUES ($1, $2, $3, $4) RETURNING id',
@@ -119,6 +135,8 @@ io.on('connection', (socket) => {
     ).then(() => {
       const s = onlineUsers.get(parseInt(senderId));
       if (s) io.to(s).emit('messages_read', { byUserId: userId });
+      // Notify the user who marked as read so they can update their UI
+      socket.emit('messages_marked_read', { senderId });
     }).catch(console.error);
   });
 
