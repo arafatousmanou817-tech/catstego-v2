@@ -20,6 +20,7 @@ const CatGallery = ({ onSelect, selectedUrl }) => {
     if (append) setLoadingMore(true);
     else setLoading(true);
 
+    const startIndex = append ? cats.length : 0;
     // Créer 9 placeholders "en chargement"
     const placeholders = Array.from({ length: 9 }, () => ({ base64: null, loading: true }));
 
@@ -30,29 +31,32 @@ const CatGallery = ({ onSelect, selectedUrl }) => {
       setLoading(false);
     }
 
-    // Charger chaque image en parallèle et mettre à jour au fur et à mesure
-    const urls = Array.from({ length: 9 }, (_, i) =>
-      `https://cataas.com/cat?width=300&height=300&t=${Date.now()}-${i}-${Math.random()}`
-    );
-
-    urls.forEach(async (url, i) => {
-      try {
-        const base64 = await fetchAsBase64(url);
-        setCats(prev => {
-          const updated = [...prev];
-          const idx = append ? prev.length - 9 + i : i;
-          updated[idx] = { base64, loading: false };
-          return updated;
-        });
-      } catch {
-        setCats(prev => {
-          const updated = [...prev];
-          const idx = append ? prev.length - 9 + i : i;
-          updated[idx] = { base64: null, loading: false, error: true };
-          return updated;
-        });
-      }
-    });
+    // Charger par lots de 3 pour un compromis performance/concurrence
+    const batchSize = 3;
+    for (let i = 0; i < 9; i += batchSize) {
+      const batch = Array.from({ length: Math.min(batchSize, 9 - i) }, (_, j) => {
+        const index = i + j;
+        const url = `https://cataas.com/cat?width=300&height=300&t=${Date.now()}-${index}-${Math.random()}`;
+        return fetchAsBase64(url)
+          .then(base64 => {
+            setCats(prev => {
+              const updated = [...prev];
+              const idx = startIndex + index;
+              if (updated[idx]) updated[idx] = { base64, loading: false };
+              return updated;
+            });
+          })
+          .catch(() => {
+            setCats(prev => {
+              const updated = [...prev];
+              const idx = startIndex + index;
+              if (updated[idx]) updated[idx] = { base64: null, loading: false, error: true };
+              return updated;
+            });
+          });
+      });
+      await Promise.all(batch);
+    }
 
     if (append) setLoadingMore(false);
   };
