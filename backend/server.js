@@ -22,12 +22,12 @@ const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
 
 const io = new Server(server, {
   cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'], credentials: true },
-  maxHttpBufferSize: 10 * 1024 * 1024
+  maxHttpBufferSize: 20 * 1024 * 1024
 });
 
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -82,9 +82,9 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (data) => {
     const { receiverId, content, type = 'text', tempId } = data;
     
-    // Validation de taille pour les images (max 10MB)
-    if (type === 'catstego_image' && content && content.length > 10 * 1024 * 1024 * 1.33) {
-      return socket.emit('message_error', { error: "L'image est trop volumineuse (max 10Mo)", tempId });
+    // Validation de taille pour les images (max 20MB)
+    if (type === 'catstego_image' && content && content.length > 20 * 1024 * 1024 * 1.33) {
+      return socket.emit('message_error', { error: "L'image est trop volumineuse (max 20Mo)", tempId });
     }
 
     try {

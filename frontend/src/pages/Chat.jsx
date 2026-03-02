@@ -245,6 +245,7 @@ const Chat = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [pendingImage, setPendingImage] = useState(null);
   const messagesEndRef = useRef(null);
   const typingTimerRef = useRef(null);
   const selectedContactRef = useRef(null);
@@ -260,9 +261,18 @@ const Chat = () => {
       setSelectedContact(location.state.selectedContact);
     }
     if (location.state?.encodedImage && location.state?.fromEncode) {
-      // Sera traité après la sélection du contact
+      setPendingImage(location.state.encodedImage);
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (selectedContact && pendingImage) {
+      sendMessage(pendingImage, 'catstego_image');
+      setPendingImage(null);
+      // Nettoyer l'état de navigation pour éviter les envois multiples au refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [selectedContact, pendingImage]);
 
   useEffect(() => {
     loadContacts();
@@ -293,10 +303,14 @@ const Chat = () => {
         const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
         const existingConvIdx = prev.findIndex(c => c.id === otherId);
         
+        const otherUser = msg.sender_id === user.id
+          ? (selectedContactRef.current || contacts.find(c => c.id === msg.receiver_id) || prev.find(c => c.id === msg.receiver_id))
+          : { username: msg.sender_username, avatar_color: msg.sender_color };
+
         const updatedConv = {
           id: otherId,
-          username: msg.sender_id === user.id ? selectedContactRef.current?.username : msg.sender_username,
-          avatar_color: msg.sender_id === user.id ? selectedContactRef.current?.avatar_color : msg.sender_color,
+          username: otherUser?.username || 'Utilisateur',
+          avatar_color: otherUser?.avatar_color || otherUser?.avatarColor || '#FF6B35',
           lastMessage: msg.content,
           lastMessageType: msg.type,
           lastMessageAt: msg.created_at,
@@ -356,6 +370,10 @@ const Chat = () => {
       setConversations(prev => prev.map(c => c.id === senderId ? { ...c, unread: 0 } : c));
     });
 
+    socket.on('online_users', (users) => {
+      // Forcer le rafraîchissement si nécessaire (déjà géré par SocketContext mais utile ici pour sync locale)
+    });
+
     return () => {
       socket.off('receive_message');
       socket.off('message_sent');
@@ -364,7 +382,16 @@ const Chat = () => {
       socket.off('messages_read');
       socket.off('messages_marked_read');
     };
-  }, [socket]); // Plus de dépendance à selectedContact — on utilise la ref
+  }, [socket, user.id, user.username, contacts]); // Plus de dépendance à selectedContact — on utilise la ref
+
+  // Sync unread count from NotificationContext to local conversations state
+  useEffect(() => {
+    if (!unreadByUser) return;
+    setConversations(prev => prev.map(conv => ({
+      ...conv,
+      unread: unreadByUser[conv.id] || 0
+    })));
+  }, [unreadByUser]);
 
   const loadContacts = async () => {
     try {
