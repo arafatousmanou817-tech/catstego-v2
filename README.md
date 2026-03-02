@@ -1,27 +1,97 @@
-# 🐱 CatStego — Messages Secrets dans des Chats
+# CatStego — Messages Secrets dans des Chats
 
-Application de **stéganographie** complète : cachez des messages secrets dans des photos de chats et partagez-les via un chat chiffré en temps réel.
+Application de **stéganographie** et de messagerie sécurisée : cachez des messages chiffrés dans des photos de chats et partagez-les via un chat en temps réel.
 
 ---
 
-## 🚀 Installation & Lancement
+## Fonctionnalités Clés
+
+### Stéganographie Avancée (LSB)
+
+- **Cacher du texte** dans les pixels d'une image de chat sans altération visible.
+- **Support PNG obligatoire** pour garantir l'intégrité des données (format sans perte).
+- **Calcul de capacité** en temps réel selon la résolution de l'image.
+- **Galerie intégrée** : récupérez des images de chats aléatoires via l'API [CATAAS](https://cataas.com).
+
+### Chiffrement Client-Side
+
+- Les messages sont chiffrés **avant** d'être injectés dans l'image.
+- **Algorithmes** : XOR (rapide) ou AES-256 (ultra-sécurisé via CryptoJS).
+- **Indicateur de force** : Analyse de la robustesse de votre clé de chiffrement.
+- **Confidentialité Totale** : Les clés de chiffrement ne transitent **jamais** sur le réseau.
+
+### Chat Temps Réel & Social
+
+- **Conversations privées** via Socket.IO.
+- **Indicateurs d'état** : Utilisateurs en ligne, "En train d'écrire...", statuts de lecture.
+- **Partage fluide** : Envoyez vos images "CatStego" directement dans la conversation.
+- **Décodage Rapide** : Bouton "Décoder" intégré aux messages reçus pour extraire le secret instantanément.
+
+### Notifications & Alertes
+
+- **Push Notifications** : Recevez des alertes même quand l'application est fermée (Web Push / VAPID).
+- **Système de Toast** : Notifications in-app pour les succès, erreurs et nouveaux messages.
+
+### Sécurité & Authentification
+
+- **Inscription vérifiée** : Validation par code OTP envoyé par email (via Brevo).
+- **Mode Simulation** : Si aucune clé API email n'est configurée, le code OTP s'affiche dans les logs serveurs pour le développement.
+- **Protection** : Mots de passe hashés avec **bcrypt**, authentification par **JWT**, et **Rate Limiting** sur les routes sensibles.
+
+---
+
+## Stack Technique
+
+| Composant           | Technologie                                |
+| :------------------ | :----------------------------------------- |
+| **Frontend**        | React 18, Vite, TailwindCSS, Framer Motion |
+| **Backend**         | Node.js, Express                           |
+| **Base de données** | PostgreSQL                                 |
+| **Temps réel**      | Socket.IO                                  |
+| **Chiffrement**     | CryptoJS (AES-256)                         |
+| **Notifications**   | Web-Push (VAPID)                           |
+| **Emails**          | Brevo API (ex-Sendinblue)                  |
+
+---
+
+## Installation & Configuration
 
 ### Prérequis
 
-- **Node.js** v18+
-- **npm** v9+
+- Node.js v18+
+- Une instance PostgreSQL
 
-### Étape 1 — Backend
+### 1. Configuration du Backend
 
 ```bash
 cd backend
 npm install
+```
+
+Créez un fichier `.env` dans le dossier `backend` en vous basant sur `.env.example` :
+
+```env
+PORT=3001
+JWT_SECRET=votre_secret_jwt
+DATABASE_URL=postgres://user:password@localhost:5432/catstego
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+BREVO_API_KEY=...
+EMAIL_FROM=...
+```
+
+_Note : Si `BREVO_API_KEY` n'est pas renseignée, les codes de vérification s'afficheront dans la console du serveur._
+
+### 2. Lancement du projet
+
+**Démarrer le serveur :**
+
+```bash
+cd backend
 node server.js
 ```
 
-Le serveur démarre sur `http://localhost:3001`
-
-### Étape 2 — Frontend (dans un autre terminal)
+**Démarrer le frontend :**
 
 ```bash
 cd frontend
@@ -29,117 +99,41 @@ npm install
 npm run dev
 ```
 
-L'app s'ouvre sur `http://localhost:5173`
+L'application sera accessible sur `http://localhost:5173`.
 
 ---
 
-## 🧱 Stack Technique
-
-| Composant       | Technologie                   |
-| --------------- | ----------------------------- |
-| Frontend        | React 18 + Vite + TailwindCSS |
-| Backend         | Node.js + Express             |
-| Base de données | Postgres                      |
-| Temps réel      | Socket.IO                     |
-| Auth            | JWT (localStorage)            |
-| Stéganographie  | Canvas API (LSB)              |
-| Chiffrement     | XOR + AES-256 (CryptoJS)      |
-| Images chats    | cataas.com API                |
-
----
-
-## 🔐 Fonctionnalités
-
-### 🐱 Stéganographie LSB
-
-- Choisir un chat depuis **cataas.com** ou importer depuis la galerie
-- Cacher un message avec **XOR** ou **AES-256**
-- Indicateur de force de clé (4 niveaux)
-- Easter egg : entrez la clé `meow` 🐱
-- Télécharger ou envoyer directement à un contact
-- Délimiteur `###END###` pour marquer la fin du message
-- Format PNG obligatoire pour préserver les LSBs
-
-### 💬 Chat en temps réel
-
-- Conversations privées Socket.IO
-- Envoi d'images CatStego directement dans le chat
-- Bouton "Décoder" sur les images reçues (clé jamais envoyée sur le réseau)
-- Indicateur "En train d'écrire..."
-- Horodatage des messages
-- Statut en ligne / hors ligne
-
-### 👥 Contacts
-
-- Recherche par username ou email
-- Ajout / suppression de contacts
-- Statut en ligne en temps réel
-
-### 🔑 Authentification
-
-- Inscription avec validation client + serveur
-- Mots de passe hashés avec bcrypt
-- JWT stocké en localStorage (7 jours)
-
----
-
-## 📁 Structure du projet
+## Structure du Projet
 
 ```txt
-catstego-v2/
+.
 ├── backend/
-│   ├── server.js          # Express + Socket.IO
-│   ├── db.js              # SQLite init
-│   ├── routes/
-│   │   ├── auth.js        # /register, /login
-│   │   ├── contacts.js    # CRUD contacts
-│   │   └── messages.js    # Historique messages
-│   └── middleware/
-│       └── auth.js        # Vérification JWT
+│   ├── routes/           # Auth, Contacts, Messages, Push
+│   ├── middleware/       # Protection JWT, Rate Limiter
+│   ├── utils/            # Emailing, Push logic
+│   ├── db.js             # Client PostgreSQL & Initialisation
+│   └── server.js         # Entrée Express + Socket.IO
 └── frontend/
     └── src/
-        ├── App.jsx
-        ├── pages/
-        │   ├── Login.jsx, Register.jsx
-        │   ├── Home.jsx, Encode.jsx, Decode.jsx
-        │   ├── Chat.jsx, Contacts.jsx
-        ├── components/
-        │   ├── PhoneFrame.jsx, Navbar.jsx
-        │   ├── CatGallery.jsx, KeyStrength.jsx
-        ├── utils/
-        │   ├── steganography.js  # LSB encode/decode
-        │   └── crypto.js         # XOR + AES-256
-        └── context/
-            ├── AuthContext.jsx
-            └── SocketContext.jsx
+        ├── components/   # UI: CatGallery, Navbar, PhoneFrame...
+        ├── context/      # Auth, Socket, Notifications
+        ├── pages/        # Login, Chat, Encode, Decode...
+        ├── utils/        # Steganography.js, Crypto.js
+        └── main.jsx
 ```
 
 ---
 
-## 🗃️ Base de données SQLite
+## Design
 
-```sql
-users     — id, username, email, password_hash, avatar_color, created_at, last_seen
-contacts  — id, user_id, contact_id, created_at
-messages  — id, sender_id, receiver_id, content, type, is_read, created_at
-```
+L'application utilise une esthétique **Dark Mode** inspirée du gaming :
 
----
-
-## 🎨 Design
-
-- Thème sombre avec **phone frame** mobile-first
-- Primary : `#FF6B35` (orange chat)
-- Accent : `#E94560` (rouge-rose)
-- Background : `#0D0D0D / #1A1A2E`
-- Police : **Poppins**
-- Icônes : **lucide-react**
+- **Couleurs** : Orange Chat (`#FF6B35`), Rouge-Rose (`#E94560`), Fond Sombre (`#0D0D0D`).
+- **Mobile First** : L'interface est encapsulée dans une "Phone Frame" pour une expérience utilisateur centrée sur le mobile.
 
 ---
 
-## 🔒 Sécurité
+# Avertissement
 
-- Les clés de déchiffrement ne transitent **jamais** sur le réseau
-- Décodage 100% côté client (Canvas API)
-- Mots de passe hashés avec **bcrypt** (coût 12)
-- JWT signé avec secret dédié
+Cette application est un projet de démonstration technique. Bien que le chiffrement AES-256 soit robuste, la stéganographie LSB est détectable par des outils d'analyse statistique de pixels. N'utilisez pas cet outil pour des communications critiques sans comprendre les limites de la stéganographie.
+
